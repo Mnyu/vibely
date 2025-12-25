@@ -1,26 +1,7 @@
-// import { Suspense } from 'react';
-// import { getQueryClient, trpc } from '@/trpc/server';
-// import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
-// import Client from './client';
-
-// const Page = async () => {
-//   const queryClient = getQueryClient();
-//   void queryClient.prefetchQuery(trpc.customHello.queryOptions({ text: 'MY-WORLD!' }));
-
-//   return (
-//     <HydrationBoundary state={dehydrate(queryClient)}>
-//       <Suspense fallback={<p>Loading...</p>}>
-//         <Client />
-//       </Suspense>
-//     </HydrationBoundary>
-//   );
-// };
-// export default Page;
-
 'use client';
 
 import { toast } from 'sonner';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { useTRPC } from '@/trpc/client';
@@ -30,10 +11,11 @@ import { Input } from '@/components/ui/input';
 const Page = () => {
   const [value, setValue] = useState('');
   const trpc = useTRPC();
-  const invoke = useMutation(
-    trpc.invoke.mutationOptions({
+  const { data: messages } = useQuery(trpc.messages.getMany.queryOptions());
+  const createMessage = useMutation(
+    trpc.messages.create.mutationOptions({
       onSuccess: () => {
-        toast.success('Background job started');
+        toast.success('Message created');
       },
     }),
   );
@@ -41,9 +23,11 @@ const Page = () => {
   return (
     <div className='p-2 max-w-7xl'>
       <Input value={value} onChange={(e) => setValue(e.target.value)} />
-      <Button disabled={invoke.isPending} onClick={() => invoke.mutate({ value: value })}>
+      <Button disabled={createMessage.isPending} onClick={() => createMessage.mutate({ value: value })}>
         Invoke Background Job
       </Button>
+      <br />
+      {JSON.stringify(messages, null, 2)}
     </div>
   );
 };
