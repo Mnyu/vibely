@@ -48,7 +48,7 @@ const MessagesContainer = ({ projectId, activeFragment, setActiveFragment }: Pro
               role={message.role}
               fragment={message.fragment}
               createdAt={message.createdAt}
-              isActiveFragment={activeFragment?.id === message.fragment?.id}
+              isActiveFragment={!!message.fragment && activeFragment?.id === message.fragment?.id}
               onFragmentClick={() => setActiveFragment(message.fragment)}
               type={message.type}
             />
