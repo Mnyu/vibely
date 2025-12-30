@@ -8,6 +8,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import FileExplorer from '@/components/file-explorer';
+import UserControl from '@/components/user-control';
 import MessagesContainer from '../components/messages-container';
 import ProjectHeader from '../components/project-header';
 import FragmentWeb from '../components/fragment-web';
@@ -60,6 +61,7 @@ const ProjectView = ({ projectId }: Props) => {
                     <CrownIcon /> Upgrade
                   </Link>
                 </Button>
+                <UserControl />
               </div>
             </div>
             <TabsContent value='preview'>{!!activeFragment && <FragmentWeb data={activeFragment} />}</TabsContent>
