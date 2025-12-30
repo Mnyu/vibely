@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+// import { useClerk } from '@clerk/nextjs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import TextareaAutosize from 'react-textarea-autosize';
@@ -28,6 +29,7 @@ const ProjectForm = () => {
   });
   const router = useRouter();
   const trpc = useTRPC();
+  // const clerk = useClerk();
   const queryClient = useQueryClient();
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
@@ -37,8 +39,12 @@ const ProjectForm = () => {
         //TODO : Invalidate usage status
       },
       onError: (error) => {
-        //TODO : Redirect to pricing page if specific error
         toast.error(error.message);
+        if (error.data?.code === 'UNAUTHORIZED') {
+          // clerk.openSignIn();
+          router.push('/sign-in');
+        }
+        //TODO : Redirect to pricing page if specific error
       },
     }),
   );
