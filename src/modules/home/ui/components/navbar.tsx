@@ -10,7 +10,6 @@ import Link from 'next/link';
 
 const Navbar = () => {
   const isScrolled = useScroll();
-  console.log(isScrolled);
   return (
     <nav
       className={cn(

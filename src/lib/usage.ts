@@ -11,13 +11,13 @@ export const getUsageTracker = async () => {
   const { has } = await auth();
   const hasProAccess = has({ plan: 'pro' });
 
-  const usageTraker = new RateLimiterPrisma({
+  const usageTracker = new RateLimiterPrisma({
     storeClient: prisma,
     tableName: 'Usage',
     points: hasProAccess ? PRO_CREDITS : FREE_CREDITS,
     duration: DURATION,
   });
-  return usageTraker;
+  return usageTracker;
 };
 
 export const consumeCredits = async () => {
@@ -25,8 +25,8 @@ export const consumeCredits = async () => {
   if (!userId) {
     throw new Error('User not authenticated');
   }
-  const usageTraker = await getUsageTracker();
-  const result = await usageTraker.consume(userId, GENERATION_CREDIT_COST);
+  const usageTracker = await getUsageTracker();
+  const result = await usageTracker.consume(userId, GENERATION_CREDIT_COST);
   return result;
 };
 
@@ -35,7 +35,7 @@ export const getUsageStatus = async () => {
   if (!userId) {
     throw new Error('User not authenticated');
   }
-  const usageTraker = await getUsageTracker();
-  const result = await usageTraker.get(userId);
+  const usageTracker = await getUsageTracker();
+  const result = await usageTracker.get(userId);
   return result;
 };
