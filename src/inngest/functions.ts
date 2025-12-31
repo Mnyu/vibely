@@ -208,8 +208,8 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
   const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(result.state.data.summary);
   const { output: responseOutput } = await responseGenerator.run(result.state.data.summary);
 
-  const generateFragmentTtitle = () => {
-    if (fragmentTitleOutput[0].type !== 'text') {
+  const generateFragmentTitle = () => {
+    if (!fragmentTitleOutput || fragmentTitleOutput.length === 0 || fragmentTitleOutput[0].type !== 'text') {
       return 'Fragment';
     }
     if (Array.isArray(fragmentTitleOutput[0].content)) {
@@ -219,7 +219,7 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
   };
 
   const generateResponse = () => {
-    if (responseOutput[0].type !== 'text') {
+    if (!responseOutput || responseOutput.length === 0 || responseOutput[0].type !== 'text') {
       return 'Here you go';
     }
     if (Array.isArray(responseOutput[0].content)) {
@@ -236,7 +236,7 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     return `https://${host}`;
   });
 
-  const fragmentTitle = generateFragmentTtitle();
+  const fragmentTitle = generateFragmentTitle();
   const response = generateResponse();
 
   await step.run('save-result', async () => {
@@ -271,6 +271,6 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     url: sandboxUrl,
     title: fragmentTitle,
     files: result.state.data.files,
-    summary: response,
+    summary: result.state.data.summary,
   };
 });
