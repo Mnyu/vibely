@@ -14,6 +14,7 @@ import { inngest } from './client';
 import { getSandbox, lastAssistantTextMessageContent } from './utils';
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from '@/prompt';
 import { prisma } from '@/lib/prisma';
+import { SANDBOX_TIMEOUT } from './types';
 
 interface AgentState {
   summary: string;
@@ -25,6 +26,7 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
 
   const sandboxId = await step.run('get-sandbox-id', async () => {
     const sandbox = await Sandbox.create(process.env.E2B_SANDBOX_ID_NEXTJS!);
+    await sandbox.setTimeout(SANDBOX_TIMEOUT); // default is 5 minutes
     return sandbox.sandboxId;
   });
 
@@ -35,8 +37,9 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
         projectId: event.data.projectId,
       },
       orderBy: {
-        createdAt: 'desc', //TODO: change to asc if AI does not understand what is the latest message
+        createdAt: 'desc',
       },
+      take: 5, // limit the history of messages to not confuse LLMs
     });
     for (const message of messages) {
       formattedMessages.push({
@@ -45,7 +48,7 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
         content: message.content,
       });
     }
-    return formattedMessages;
+    return formattedMessages.reverse();
   });
 
   const state = createState<AgentState>(
