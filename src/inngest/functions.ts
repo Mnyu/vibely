@@ -1,9 +1,18 @@
 import { z } from 'zod';
 import Sandbox from 'e2b';
-import { createAgent, createNetwork, createTool, gemini, openai, type Tool } from '@inngest/agent-kit';
+import {
+  createAgent,
+  createNetwork,
+  createTool,
+  createState,
+  gemini,
+  openai,
+  type Tool,
+  type Message,
+} from '@inngest/agent-kit';
 import { inngest } from './client';
 import { getSandbox, lastAssistantTextMessageContent } from './utils';
-import { PROMPT } from '@/prompt';
+import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from '@/prompt';
 import { prisma } from '@/lib/prisma';
 
 interface AgentState {
@@ -18,6 +27,36 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     const sandbox = await Sandbox.create(process.env.E2B_SANDBOX_ID_NEXTJS!);
     return sandbox.sandboxId;
   });
+
+  const previousMessages = await step.run('get-previous-messages', async () => {
+    const formattedMessages: Message[] = [];
+    const messages = await prisma.message.findMany({
+      where: {
+        projectId: event.data.projectId,
+      },
+      orderBy: {
+        createdAt: 'desc', //TODO: change to asc if AI does not understand what is the latest message
+      },
+    });
+    for (const message of messages) {
+      formattedMessages.push({
+        type: 'text',
+        role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
+        content: message.content,
+      });
+    }
+    return formattedMessages;
+  });
+
+  const state = createState<AgentState>(
+    {
+      summary: '',
+      files: {},
+    },
+    {
+      messages: previousMessages,
+    },
+  );
 
   const codeAgent = createAgent<AgentState>({
     name: 'code-agent',
@@ -128,6 +167,7 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     name: 'coding-agent-network',
     agents: [codeAgent],
     maxIter: 15,
+    defaultState: state,
     router: async ({ network }) => {
       const summary = network.state.data.summary;
       if (summary) {
@@ -137,8 +177,56 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     },
   });
 
-  // const { output } = await codeAgent.run(`Write the code snippet for : ${event.data.value}`);
-  const result = await network.run(event.data.value);
+  const result = await network.run(event.data.value, { state: state });
+
+  const fragmentTitleGenerator = createAgent({
+    name: 'fragment-title-generator',
+    description: 'a fragment title generator',
+    system: FRAGMENT_TITLE_PROMPT,
+    model: gemini({ model: 'gemini-2.5-flash' }),
+    // model: openai({
+    //   model: 'gpt-4.0',
+    //   defaultParameters: {
+    //     temperature: 0.1,
+    //   },
+    // }),
+  });
+
+  const responseGenerator = createAgent({
+    name: 'response-generator',
+    description: 'a response generator',
+    system: RESPONSE_PROMPT,
+    model: gemini({ model: 'gemini-2.5-flash' }),
+    // model: openai({
+    //   model: 'gpt-4.0',
+    //   defaultParameters: {
+    //     temperature: 0.1,
+    //   },
+    // }),
+  });
+
+  const { output: fragmentTitleOutput } = await fragmentTitleGenerator.run(result.state.data.summary);
+  const { output: responseOutput } = await responseGenerator.run(result.state.data.summary);
+
+  const generateFragmentTtitle = () => {
+    if (fragmentTitleOutput[0].type !== 'text') {
+      return 'Fragment';
+    }
+    if (Array.isArray(fragmentTitleOutput[0].content)) {
+      return fragmentTitleOutput[0].content.map((txt) => txt).join('');
+    }
+    return fragmentTitleOutput[0].content;
+  };
+
+  const generateResponse = () => {
+    if (responseOutput[0].type !== 'text') {
+      return 'Here you go';
+    }
+    if (Array.isArray(responseOutput[0].content)) {
+      return responseOutput[0].content.map((txt) => txt).join('');
+    }
+    return responseOutput[0].content;
+  };
 
   const isError = !result.state.data.summary || Object.keys(result.state.data.files || {}).length === 0;
 
@@ -147,6 +235,9 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     const host = sandbox.getHost(3000);
     return `https://${host}`;
   });
+
+  const fragmentTitle = generateFragmentTtitle();
+  const response = generateResponse();
 
   await step.run('save-result', async () => {
     if (isError) {
@@ -162,13 +253,13 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
     return await prisma.message.create({
       data: {
         projectId: event.data.projectId,
-        content: result.state.data.summary,
+        content: response,
         role: 'ASSISTANT',
         type: 'RESULT',
         fragment: {
           create: {
             sandboxUrl: sandboxUrl,
-            title: 'Fragment',
+            title: fragmentTitle,
             files: result.state.data.files,
           },
         },
@@ -178,8 +269,8 @@ export const aicoder = inngest.createFunction({ id: 'aicoder' }, { event: 'aicod
 
   return {
     url: sandboxUrl,
-    title: 'Fragment',
+    title: fragmentTitle,
     files: result.state.data.files,
-    summary: result.state.data.summary,
+    summary: response,
   };
 });
